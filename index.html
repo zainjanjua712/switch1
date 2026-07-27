@@ -6,10 +6,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <style>
-        body { font-family: Arial; padding: 20px; max-width: 400px; margin: auto; background: #f0f0f0; }
-        .container { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        h1 { text-align: center; color: #333; }
-        .status-box { padding: 15px; margin: 10px 0; border-radius: 8px; text-align: center; font-weight: bold; }
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            max-width: 400px; 
+            margin: auto; 
+            background: #f0f0f0; 
+        }
+        .container { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 10px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+        }
+        h1 { text-align: center; color: #333; margin-top: 0; }
+        .status-box { 
+            padding: 15px; 
+            margin: 10px 0; 
+            border-radius: 8px; 
+            text-align: center; 
+            font-weight: bold; 
+        }
         .connected { background: #4CAF50; color: white; }
         .disconnected { background: #f44336; color: white; }
         .connecting { background: #FFC107; color: #333; }
@@ -20,14 +37,31 @@
             border: none;
             border-radius: 8px;
             cursor: pointer;
-            width: 100px;
             font-weight: bold;
+            transition: all 0.3s;
         }
-        .btn-on { background: #4CAF50; color: white; }
-        .btn-off { background: #f44336; color: white; }
-        .btn-connect { background: #2196F3; color: white; width: 100%; margin: 10px 0; }
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
-        .btn-group { display: flex; justify-content: center; gap: 10px; margin: 15px 0; }
+        button:active { transform: scale(0.95); }
+        .btn-on { background: #4CAF50; color: white; width: 120px; }
+        .btn-off { background: #f44336; color: white; width: 120px; }
+        .btn-connect { 
+            background: #2196F3; 
+            color: white; 
+            width: 100%; 
+            padding: 15px;
+            margin: 10px 0;
+            font-size: 16px;
+        }
+        button:disabled { 
+            opacity: 0.5; 
+            cursor: not-allowed; 
+            transform: none;
+        }
+        .btn-group { 
+            display: flex; 
+            justify-content: center; 
+            gap: 15px; 
+            margin: 20px 0; 
+        }
         .log { 
             background: #1e1e1e; 
             color: #00ff00; 
@@ -35,11 +69,27 @@
             border-radius: 5px; 
             height: 150px; 
             overflow-y: auto; 
-            font-family: monospace; 
+            font-family: 'Courier New', monospace; 
             font-size: 11px;
             margin-top: 15px;
+            white-space: pre-wrap;
         }
-        .light-status { text-align: center; font-size: 24px; margin: 10px 0; }
+        .light-status { 
+            text-align: center; 
+            font-size: 28px; 
+            margin: 15px 0;
+            padding: 10px;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .light-on { color: #4CAF50; }
+        .light-off { color: #f44336; }
+        .info {
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+            margin: 10px 0;
+        }
     </style>
 </head>
 <body>
@@ -57,20 +107,22 @@
         <button class="btn-connect" id="connectBtn">📡 Connect to MQTT</button>
         
         <div class="btn-group">
-            <button class="btn-on" id="onBtn" disabled>ON</button>
-            <button class="btn-off" id="offBtn" disabled>OFF</button>
+            <button class="btn-on" id="onBtn" disabled>💡 ON</button>
+            <button class="btn-off" id="offBtn" disabled>⭕ OFF</button>
         </div>
         
-        <div class="log" id="log">
-            > Log started...
-        </div>
+        <div class="info">Broker: broker.emqx.io:8084 (Secure WebSocket)</div>
+        
+        <div class="log" id="log">> Log started...\n> Click Connect to begin</div>
     </div>
 
     <script>
         let client = null;
         let isConnected = false;
-        const BROKER = "test.mosquitto.org";
-        const PORT = 1883;
+        
+        // 🔥 FIXED: Using EMQX broker with secure WebSocket
+        const BROKER = "broker.emqx.io";
+        const PORT = 8084;  // Secure WebSocket port
         const TOPIC_CONTROL = "house/livingroom/light";
         const TOPIC_STATUS = "house/livingroom/light/status";
 
@@ -83,25 +135,28 @@
 
         function updateStatus(connected, message = '') {
             const box = document.getElementById('statusBox');
-            const statusText = document.getElementById('statusText');
             
             if (connected) {
                 box.className = 'status-box connected';
-                box.innerHTML = '✅ Connected to MQTT';
+                box.innerHTML = '✅ Connected to MQTT Broker';
                 document.getElementById('onBtn').disabled = false;
                 document.getElementById('offBtn').disabled = false;
                 document.getElementById('connectBtn').textContent = '🔌 Disconnect';
+                document.getElementById('connectBtn').style.background = '#f44336';
             } else if (message === 'connecting') {
                 box.className = 'status-box connecting';
-                box.innerHTML = '⏳ Connecting...';
+                box.innerHTML = '⏳ Connecting to MQTT...';
                 document.getElementById('onBtn').disabled = true;
                 document.getElementById('offBtn').disabled = true;
+                document.getElementById('connectBtn').textContent = '⏳ Connecting...';
+                document.getElementById('connectBtn').style.background = '#FFC107';
             } else {
                 box.className = 'status-box disconnected';
                 box.innerHTML = '⚠️ ' + (message || 'Disconnected');
                 document.getElementById('onBtn').disabled = true;
                 document.getElementById('offBtn').disabled = true;
                 document.getElementById('connectBtn').textContent = '📡 Connect to MQTT';
+                document.getElementById('connectBtn').style.background = '#2196F3';
             }
             isConnected = connected;
         }
@@ -110,10 +165,10 @@
             const lightStatus = document.getElementById('lightStatus');
             if (state === 'ON') {
                 lightStatus.innerHTML = '🟢 Light is ON';
-                lightStatus.style.color = '#4CAF50';
+                lightStatus.className = 'light-status light-on';
             } else {
                 lightStatus.innerHTML = '🔴 Light is OFF';
-                lightStatus.style.color = '#f44336';
+                lightStatus.className = 'light-status light-off';
             }
         }
 
@@ -126,19 +181,21 @@
             }
 
             updateStatus(false, 'connecting');
-            log(`Attempting to connect to ${BROKER}:${PORT}...`);
+            log(`Connecting to ${BROKER}:${PORT} via Secure WebSocket...`);
             
             try {
                 const clientId = "web_" + Math.random().toString(36).substr(2, 8);
+                
+                // Create MQTT client with secure WebSocket
                 client = new Paho.MQTT.Client(BROKER, PORT, clientId);
                 
                 client.onConnectionLost = function(responseObject) {
-                    log('Connection lost: ' + (responseObject.errorMessage || 'Unknown'));
+                    log('❌ Connection lost: ' + (responseObject.errorMessage || 'Unknown'));
                     updateStatus(false, 'Connection lost');
                 };
 
                 client.onMessageArrived = function(message) {
-                    log(`Message: ${message.destinationName} = ${message.payloadString}`);
+                    log(`📨 Received: ${message.destinationName} = ${message.payloadString}`);
                     if (message.destinationName === TOPIC_STATUS) {
                         updateLightStatus(message.payloadString);
                     }
@@ -147,21 +204,22 @@
                 const options = {
                     timeout: 10,
                     keepAliveInterval: 30,
+                    useSSL: true,  // 🔥 THIS IS KEY - Enables secure WebSocket
+                    cleanSession: true,
                     onSuccess: function() {
-                        log('✅ Connected to MQTT broker!');
+                        log('✅ Connected to MQTT broker via WSS!');
                         updateStatus(true);
                         
-                        // Subscribe to status topic
+                        // Subscribe to status updates
                         client.subscribe(TOPIC_STATUS);
-                        log(`Subscribed to ${TOPIC_STATUS}`);
+                        log(`📡 Subscribed to: ${TOPIC_STATUS}`);
                         
                         // Request current status
-                        log('Requesting current status...');
-                        // Send empty message to trigger status update
+                        log('⏳ Waiting for status update...');
                     },
                     onFailure: function(error) {
                         log('❌ Connection FAILED: ' + error.errorMessage);
-                        updateStatus(false, 'Connection failed: ' + error.errorMessage);
+                        updateStatus(false, 'Failed: ' + error.errorMessage);
                     }
                 };
 
@@ -173,6 +231,7 @@
             }
         };
 
+        // Send ON command
         document.getElementById('onBtn').onclick = function() {
             if (client && client.isConnected()) {
                 const msg = new Paho.MQTT.Message('ON');
@@ -180,9 +239,12 @@
                 client.send(msg);
                 log('📤 Sent: ON');
                 updateLightStatus('ON'); // Optimistic update
+            } else {
+                log('⚠️ Not connected to MQTT broker!');
             }
         };
 
+        // Send OFF command
         document.getElementById('offBtn').onclick = function() {
             if (client && client.isConnected()) {
                 const msg = new Paho.MQTT.Message('OFF');
@@ -190,17 +252,16 @@
                 client.send(msg);
                 log('📤 Sent: OFF');
                 updateLightStatus('OFF'); // Optimistic update
+            } else {
+                log('⚠️ Not connected to MQTT broker!');
             }
         };
 
-        // Initialize
-        log('Page loaded');
-        updateStatus(false, 'Click Connect');
-        
-        // Try auto-connect on page load
+        // Auto-connect on page load (with delay to ensure everything loads)
         setTimeout(() => {
+            log('🔄 Auto-connecting...');
             document.getElementById('connectBtn').click();
-        }, 1000);
+        }, 1500);
     </script>
 </body>
 </html>
