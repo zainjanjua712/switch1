@@ -3,93 +3,340 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Relay Control</title>
+    <title>2-Channel Smart Relay Control</title>
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
-        *{margin:0;padding:0;box-sizing:border-box;}
-        body{font-family:'Segoe UI',Arial,sans-serif;background:linear-gradient(135deg,#f093fb 0%,#f5576c 100%);min-height:100vh;display:flex;justify-content:center;align-items:center;padding:20px;}
-        .container{background:white;border-radius:30px;padding:40px;max-width:450px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
-        h1{text-align:center;color:#333;margin-bottom:5px;}
-        .subtitle{text-align:center;color:#999;font-size:14px;margin-bottom:20px;}
-        .status-box{padding:12px;border-radius:12px;text-align:center;margin-bottom:20px;font-weight:bold;}
-        .status-box.connected{background:#d4edda;color:#155724;border:2px solid #28a745;}
-        .status-box.disconnected{background:#f8d7da;color:#721c24;border:2px solid #dc3545;}
-        .btn{width:100%;padding:14px;border:none;border-radius:12px;font-size:16px;font-weight:bold;cursor:pointer;transition:all 0.3s;margin-bottom:10px;}
-        .btn-success{background:#28a745;color:white;}
-        .btn-danger{background:#dc3545;color:white;}
-        .btn-warning{background:#ffc107;color:#333;}
-        .btn-primary{background:#667eea;color:white;}
-        .btn:disabled{opacity:0.5;cursor:not-allowed;}
-        .btn:hover:not(:disabled){transform:translateY(-2px);}
-        .relay-display{text-align:center;padding:30px;margin:20px 0;border-radius:15px;background:#f8f9fa;transition:all 0.5s;}
-        .relay-display.on{background:#d4edda;border:3px solid #28a745;}
-        .relay-display.off{background:#f8d7da;border:3px solid #dc3545;}
-        .relay-display .icon{font-size:60px;margin-bottom:10px;}
-        .relay-display .state-text{font-size:24px;font-weight:bold;}
-        .relay-display.on .state-text{color:#28a745;}
-        .relay-display.off .state-text{color:#dc3545;}
-        .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-        .broker-info{background:#f0f0f0;padding:10px;border-radius:10px;text-align:center;font-size:13px;margin:10px 0;}
-        .broker-info span{font-weight:bold;color:#333;}
-        .footer{text-align:center;margin-top:20px;font-size:12px;color:#999;}
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 30px;
+            padding: 30px;
+            max-width: 480px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #999;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+        .status-box {
+            padding: 12px;
+            border-radius: 12px;
+            text-align: center;
+            margin-bottom: 20px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        .status-box.connected {
+            background: #d4edda;
+            color: #155724;
+            border: 2px solid #28a745;
+        }
+        .status-box.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+            border: 2px solid #dc3545;
+        }
+        .status-box.connecting {
+            background: #fff3cd;
+            color: #856404;
+            border: 2px solid #ffc107;
+        }
+        .broker-info {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 12px;
+            margin: 10px 0;
+            color: #666;
+        }
+        .broker-info span {
+            font-weight: bold;
+            color: #333;
+        }
+
+        /* Relay Cards */
+        .relay-card {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            margin: 15px 0;
+            border: 2px solid #e0e0e0;
+            transition: all 0.5s;
+        }
+        .relay-card.active {
+            border-color: #28a745;
+            background: #f0fff4;
+        }
+        .relay-card.inactive {
+            border-color: #dc3545;
+            background: #fff5f5;
+        }
+        .relay-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .relay-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+        .relay-status-badge {
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: bold;
+        }
+        .relay-status-badge.on {
+            background: #28a745;
+            color: white;
+        }
+        .relay-status-badge.off {
+            background: #dc3545;
+            color: white;
+        }
+        .relay-status-badge.unknown {
+            background: #6c757d;
+            color: white;
+        }
+        .relay-display {
+            text-align: center;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 10px;
+            background: white;
+            transition: all 0.3s;
+        }
+        .relay-display .icon {
+            font-size: 40px;
+            display: block;
+        }
+        .relay-display .state-text {
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+        .relay-display.on .state-text {
+            color: #28a745;
+        }
+        .relay-display.off .state-text {
+            color: #dc3545;
+        }
+
+        .btn-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+        }
+        .btn {
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn:active {
+            transform: scale(0.95);
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        .btn-success:hover:not(:disabled) {
+            background: #218838;
+        }
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        .btn-danger:hover:not(:disabled) {
+            background: #c82333;
+        }
+        .btn-warning {
+            background: #ffc107;
+            color: #333;
+        }
+        .btn-warning:hover:not(:disabled) {
+            background: #e0a800;
+        }
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background: #5a67d8;
+        }
+        .btn-sm {
+            padding: 8px 12px;
+            font-size: 12px;
+        }
+
+        .connect-section {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        .connect-section .btn {
+            flex: 1;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 12px;
+            color: #ccc;
+        }
+        .all-controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .all-controls .btn {
+            padding: 10px;
+            font-size: 13px;
+        }
+        @media (max-width: 400px) {
+            .container {
+                padding: 20px;
+            }
+            .btn-group {
+                grid-template-columns: 1fr 1fr;
+            }
+            .btn-group .btn:last-child {
+                grid-column: span 2;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>💡 Smart Relay</h1>
-        <div class="subtitle">Control via MQTT</div>
+        <h1>🔌 2-Channel Relay</h1>
+        <div class="subtitle">Smart Home Control</div>
 
         <div id="statusBox" class="status-box disconnected">
             ⚠️ Disconnected from MQTT
         </div>
 
         <div class="broker-info">
-            📡 Broker: <span>broker.emqx.io</span> | Topic: <span>smartrelay/pod1/control</span>
+            📡 Broker: <span>broker.emqx.io</span>
         </div>
 
-        <!-- Relay Status Display -->
-        <div id="relayDisplay" class="relay-display off">
-            <div class="icon">💡</div>
-            <div class="state-text">OFF</div>
+        <!-- ===== RELAY 1 ===== -->
+        <div class="relay-card inactive" id="relay1Card">
+            <div class="relay-header">
+                <span class="relay-title">⚡ Relay 1</span>
+                <span class="relay-status-badge unknown" id="relay1Badge">Unknown</span>
+            </div>
+            <div class="relay-display off" id="relay1Display">
+                <span class="icon">💡</span>
+                <div class="state-text">OFF</div>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-success" onclick="sendCommand(1, 'ON')" id="relay1On" disabled>ON</button>
+                <button class="btn btn-danger" onclick="sendCommand(1, 'OFF')" id="relay1Off" disabled>OFF</button>
+                <button class="btn btn-warning" onclick="sendCommand(1, 'TOGGLE')" id="relay1Toggle" disabled>Toggle</button>
+            </div>
         </div>
 
-        <!-- Control Buttons -->
-        <div class="grid-2">
-            <button id="btnOn" class="btn btn-success" onclick="sendCommand('ON')" disabled>
-                ✅ Turn ON
+        <!-- ===== RELAY 2 ===== -->
+        <div class="relay-card inactive" id="relay2Card">
+            <div class="relay-header">
+                <span class="relay-title">⚡ Relay 2</span>
+                <span class="relay-status-badge unknown" id="relay2Badge">Unknown</span>
+            </div>
+            <div class="relay-display off" id="relay2Display">
+                <span class="icon">💡</span>
+                <div class="state-text">OFF</div>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-success" onclick="sendCommand(2, 'ON')" id="relay2On" disabled>ON</button>
+                <button class="btn btn-danger" onclick="sendCommand(2, 'OFF')" id="relay2Off" disabled>OFF</button>
+                <button class="btn btn-warning" onclick="sendCommand(2, 'TOGGLE')" id="relay2Toggle" disabled>Toggle</button>
+            </div>
+        </div>
+
+        <!-- ===== ALL CONTROLS ===== -->
+        <div class="relay-card" style="border-color:#667eea; background:#f8f9fa;">
+            <div style="text-align:center; font-weight:bold; margin-bottom:10px; color:#333;">
+                🔄 Control All Relays
+            </div>
+            <div class="all-controls">
+                <button class="btn btn-success" onclick="sendCommand(0, 'ALL_ON')" disabled id="allOn">All ON</button>
+                <button class="btn btn-danger" onclick="sendCommand(0, 'ALL_OFF')" disabled id="allOff">All OFF</button>
+                <button class="btn btn-warning" onclick="sendCommand(0, 'ALL_TOGGLE')" disabled id="allToggle">All Toggle</button>
+                <button class="btn btn-primary" onclick="sendCommand(0, 'ALL_STATUS')" disabled id="allStatus">Get Status</button>
+            </div>
+        </div>
+
+        <!-- ===== CONNECTION BUTTONS ===== -->
+        <div class="connect-section">
+            <button class="btn btn-primary" onclick="connectMQTT()" id="connectBtn">
+                🔌 Connect
             </button>
-            <button id="btnOff" class="btn btn-danger" onclick="sendCommand('OFF')" disabled>
-                ❌ Turn OFF
+            <button class="btn btn-danger" onclick="disconnectMQTT()" id="disconnectBtn" style="display:none;">
+                ⚡ Disconnect
             </button>
         </div>
-        <button id="btnToggle" class="btn btn-warning" onclick="sendCommand('TOGGLE')" disabled>
-            🔄 Toggle Relay
-        </button>
 
-        <div style="margin-top:15px;text-align:center;font-size:13px;color:#666;">
-            Status: <span id="relayState">Unknown</span>
+        <div class="footer">
+            2-Channel Smart Relay v2.0
         </div>
-
-        <button class="btn btn-primary" onclick="connectMQTT()" id="connectBtn">
-            🔌 Connect to MQTT
-        </button>
-        <button class="btn btn-danger" onclick="disconnectMQTT()" id="disconnectBtn" style="display:none;">
-            ⚡ Disconnect
-        </button>
-
-        <div class="footer">Smart Relay Controller v2.0</div>
     </div>
 
     <script>
         let client = null;
         let isConnected = false;
-        const CONTROL_TOPIC = "smartrelay/pod1/control";
-        const STATUS_TOPIC = "smartrelay/pod1/status";
+
+        // Topics
+        const TOPICS = {
+            control1: "smartrelay/pod1/control1",
+            status1: "smartrelay/pod1/status1",
+            control2: "smartrelay/pod1/control2",
+            status2: "smartrelay/pod1/status2"
+        };
+
         const BROKER_URL = "wss://broker.emqx.io:8084/mqtt";
 
+        // Relay states
+        let relay1State = '?';
+        let relay2State = '?';
+
+        // ===== CONNECT TO MQTT =====
         function connectMQTT() {
             const statusBox = document.getElementById('statusBox');
-            statusBox.className = 'status-box disconnected';
+            statusBox.className = 'status-box connecting';
             statusBox.innerHTML = '⏳ Connecting to MQTT...';
 
             try {
@@ -99,17 +346,29 @@
                 });
 
                 client.on('connect', function() {
-                    console.log('Connected to MQTT');
+                    console.log('✅ Connected to MQTT');
                     isConnected = true;
-                    client.subscribe(STATUS_TOPIC);
+                    
+                    // Subscribe to status topics
+                    client.subscribe(TOPICS.status1);
+                    client.subscribe(TOPICS.status2);
+                    
                     updateUI(true);
-                    client.publish(CONTROL_TOPIC, 'STATUS');
+                    
+                    // Request current status
+                    client.publish(TOPICS.control1, 'STATUS');
+                    client.publish(TOPICS.control2, 'STATUS');
                 });
 
                 client.on('message', function(topic, message) {
                     const msg = message.toString();
-                    console.log(`Status: ${msg}`);
-                    updateRelayStatus(msg);
+                    console.log(`📩 ${topic} -> ${msg}`);
+                    
+                    if (topic === TOPICS.status1) {
+                        updateRelayStatus(1, msg);
+                    } else if (topic === TOPICS.status2) {
+                        updateRelayStatus(2, msg);
+                    }
                 });
 
                 client.on('error', function(err) {
@@ -131,6 +390,7 @@
             }
         }
 
+        // ===== DISCONNECT =====
         function disconnectMQTT() {
             if (client) {
                 client.end();
@@ -140,66 +400,102 @@
             updateUI(false);
         }
 
-        function sendCommand(command) {
+        // ===== SEND COMMAND =====
+        function sendCommand(relay, command) {
             if (!isConnected || !client) {
                 alert('Not connected to MQTT!');
                 return;
             }
-            client.publish(CONTROL_TOPIC, command);
-            console.log(`Sent: ${command}`);
+
+            let topic;
+            if (relay === 1) topic = TOPICS.control1;
+            else if (relay === 2) topic = TOPICS.control2;
+            else {
+                // All relays
+                client.publish(TOPICS.control1, command.replace('ALL_', ''));
+                client.publish(TOPICS.control2, command.replace('ALL_', ''));
+                console.log(`📤 Sent to both: ${command}`);
+                return;
+            }
+
+            client.publish(topic, command);
+            console.log(`📤 Relay${relay}: ${command}`);
         }
 
-        function updateRelayStatus(status) {
-            const display = document.getElementById('relayDisplay');
-            const stateText = document.getElementById('relayState');
+        // ===== UPDATE RELAY STATUS =====
+        function updateRelayStatus(relay, status) {
+            const display = document.getElementById(`relay${relay}Display`);
+            const badge = document.getElementById(`relay${relay}Badge`);
+            const card = document.getElementById(`relay${relay}Card`);
             
             if (status === 'ON') {
                 display.className = 'relay-display on';
                 display.querySelector('.state-text').textContent = 'ON';
-                stateText.textContent = 'ON';
-                stateText.style.color = '#28a745';
+                badge.textContent = 'ON';
+                badge.className = 'relay-status-badge on';
+                card.className = 'relay-card active';
+                
+                if (relay === 1) relay1State = 'ON';
+                else relay2State = 'ON';
             } else if (status === 'OFF') {
                 display.className = 'relay-display off';
                 display.querySelector('.state-text').textContent = 'OFF';
-                stateText.textContent = 'OFF';
-                stateText.style.color = '#dc3545';
+                badge.textContent = 'OFF';
+                badge.className = 'relay-status-badge off';
+                card.className = 'relay-card inactive';
+                
+                if (relay === 1) relay1State = 'OFF';
+                else relay2State = 'OFF';
             } else {
                 display.className = 'relay-display off';
                 display.querySelector('.state-text').textContent = '?';
-                stateText.textContent = 'Unknown';
-                stateText.style.color = '#666';
+                badge.textContent = 'Unknown';
+                badge.className = 'relay-status-badge unknown';
+                card.className = 'relay-card inactive';
+                
+                if (relay === 1) relay1State = '?';
+                else relay2State = '?';
             }
         }
 
+        // ===== UPDATE UI =====
         function updateUI(connected) {
             const statusBox = document.getElementById('statusBox');
             const connectBtn = document.getElementById('connectBtn');
             const disconnectBtn = document.getElementById('disconnectBtn');
-            const btnOn = document.getElementById('btnOn');
-            const btnOff = document.getElementById('btnOff');
-            const btnToggle = document.getElementById('btnToggle');
             
+            const buttons = [
+                'relay1On', 'relay1Off', 'relay1Toggle',
+                'relay2On', 'relay2Off', 'relay2Toggle',
+                'allOn', 'allOff', 'allToggle', 'allStatus'
+            ];
+
             if (connected) {
                 statusBox.className = 'status-box connected';
                 statusBox.innerHTML = '✅ Connected to MQTT Broker';
                 connectBtn.style.display = 'none';
                 disconnectBtn.style.display = 'block';
-                btnOn.disabled = false;
-                btnOff.disabled = false;
-                btnToggle.disabled = false;
+                
+                buttons.forEach(id => {
+                    document.getElementById(id).disabled = false;
+                });
             } else {
                 statusBox.className = 'status-box disconnected';
                 statusBox.innerHTML = '⚠️ Disconnected from MQTT';
                 connectBtn.style.display = 'block';
                 disconnectBtn.style.display = 'none';
-                btnOn.disabled = true;
-                btnOff.disabled = true;
-                btnToggle.disabled = true;
-                updateRelayStatus('?');
+                
+                buttons.forEach(id => {
+                    document.getElementById(id).disabled = true;
+                });
+                
+                // Reset displays
+                updateRelayStatus(1, '?');
+                updateRelayStatus(2, '?');
             }
         }
 
-        // Auto-connect on page load
+        // ===== AUTO-CONNECT ON LOAD =====
         window.onload = function() {
             setTimeout(connectMQTT, 1000);
         };
