@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2-Channel Smart Relay Control</title>
+    <title>3-Channel Smart Relay Control</title>
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
         * {
@@ -24,7 +24,7 @@
             background: white;
             border-radius: 30px;
             padding: 30px;
-            max-width: 480px;
+            max-width: 500px;
             width: 100%;
             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
         }
@@ -197,9 +197,12 @@
         .btn-primary:hover:not(:disabled) {
             background: #5a67d8;
         }
-        .btn-sm {
-            padding: 8px 12px;
-            font-size: 12px;
+        .btn-info {
+            background: #17a2b8;
+            color: white;
+        }
+        .btn-info:hover:not(:disabled) {
+            background: #138496;
         }
 
         .connect-section {
@@ -219,30 +222,34 @@
         }
         .all-controls {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 8px;
             margin-top: 10px;
         }
         .all-controls .btn {
             padding: 10px;
-            font-size: 13px;
+            font-size: 12px;
         }
+
+        /* Color coding for relays */
+        .relay-1 .relay-title { color: #007bff; }
+        .relay-2 .relay-title { color: #28a745; }
+        .relay-3 .relay-title { color: #dc3545; }
+        .relay-1.active { border-color: #007bff; background: #f0f7ff; }
+        .relay-2.active { border-color: #28a745; background: #f0fff4; }
+        .relay-3.active { border-color: #dc3545; background: #fff5f5; }
+
         @media (max-width: 400px) {
-            .container {
-                padding: 20px;
-            }
-            .btn-group {
-                grid-template-columns: 1fr 1fr;
-            }
-            .btn-group .btn:last-child {
-                grid-column: span 2;
-            }
+            .container { padding: 20px; }
+            .btn-group { grid-template-columns: 1fr 1fr; }
+            .btn-group .btn:last-child { grid-column: span 2; }
+            .all-controls { grid-template-columns: 1fr 1fr; }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🔌 2-Channel Relay</h1>
+        <h1>🔌 3-Channel Relay</h1>
         <div class="subtitle">Smart Home Control</div>
 
         <div id="statusBox" class="status-box disconnected">
@@ -254,9 +261,9 @@
         </div>
 
         <!-- ===== RELAY 1 ===== -->
-        <div class="relay-card inactive" id="relay1Card">
+        <div class="relay-card relay-1 inactive" id="relay1Card">
             <div class="relay-header">
-                <span class="relay-title">⚡ Relay 1</span>
+                <span class="relay-title">🔵 Relay 1</span>
                 <span class="relay-status-badge unknown" id="relay1Badge">Unknown</span>
             </div>
             <div class="relay-display off" id="relay1Display">
@@ -271,9 +278,9 @@
         </div>
 
         <!-- ===== RELAY 2 ===== -->
-        <div class="relay-card inactive" id="relay2Card">
+        <div class="relay-card relay-2 inactive" id="relay2Card">
             <div class="relay-header">
-                <span class="relay-title">⚡ Relay 2</span>
+                <span class="relay-title">🟢 Relay 2</span>
                 <span class="relay-status-badge unknown" id="relay2Badge">Unknown</span>
             </div>
             <div class="relay-display off" id="relay2Display">
@@ -287,6 +294,23 @@
             </div>
         </div>
 
+        <!-- ===== RELAY 3 ===== -->
+        <div class="relay-card relay-3 inactive" id="relay3Card">
+            <div class="relay-header">
+                <span class="relay-title">🔴 Relay 3</span>
+                <span class="relay-status-badge unknown" id="relay3Badge">Unknown</span>
+            </div>
+            <div class="relay-display off" id="relay3Display">
+                <span class="icon">💡</span>
+                <div class="state-text">OFF</div>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-success" onclick="sendCommand(3, 'ON')" id="relay3On" disabled>ON</button>
+                <button class="btn btn-danger" onclick="sendCommand(3, 'OFF')" id="relay3Off" disabled>OFF</button>
+                <button class="btn btn-warning" onclick="sendCommand(3, 'TOGGLE')" id="relay3Toggle" disabled>Toggle</button>
+            </div>
+        </div>
+
         <!-- ===== ALL CONTROLS ===== -->
         <div class="relay-card" style="border-color:#667eea; background:#f8f9fa;">
             <div style="text-align:center; font-weight:bold; margin-bottom:10px; color:#333;">
@@ -296,7 +320,7 @@
                 <button class="btn btn-success" onclick="sendCommand(0, 'ALL_ON')" disabled id="allOn">All ON</button>
                 <button class="btn btn-danger" onclick="sendCommand(0, 'ALL_OFF')" disabled id="allOff">All OFF</button>
                 <button class="btn btn-warning" onclick="sendCommand(0, 'ALL_TOGGLE')" disabled id="allToggle">All Toggle</button>
-                <button class="btn btn-primary" onclick="sendCommand(0, 'ALL_STATUS')" disabled id="allStatus">Get Status</button>
+                <button class="btn btn-info" onclick="sendCommand(0, 'ALL_STATUS')" disabled id="allStatus">Get Status</button>
             </div>
         </div>
 
@@ -311,7 +335,7 @@
         </div>
 
         <div class="footer">
-            2-Channel Smart Relay v2.0
+            3-Channel Smart Relay v2.0
         </div>
     </div>
 
@@ -324,7 +348,9 @@
             control1: "smartrelay/pod1/control1",
             status1: "smartrelay/pod1/status1",
             control2: "smartrelay/pod1/control2",
-            status2: "smartrelay/pod1/status2"
+            status2: "smartrelay/pod1/status2",
+            control3: "smartrelay/pod1/control3",
+            status3: "smartrelay/pod1/status3"
         };
 
         const BROKER_URL = "wss://broker.emqx.io:8084/mqtt";
@@ -332,6 +358,7 @@
         // Relay states
         let relay1State = '?';
         let relay2State = '?';
+        let relay3State = '?';
 
         // ===== CONNECT TO MQTT =====
         function connectMQTT() {
@@ -352,12 +379,14 @@
                     // Subscribe to status topics
                     client.subscribe(TOPICS.status1);
                     client.subscribe(TOPICS.status2);
+                    client.subscribe(TOPICS.status3);
                     
                     updateUI(true);
                     
                     // Request current status
                     client.publish(TOPICS.control1, 'STATUS');
                     client.publish(TOPICS.control2, 'STATUS');
+                    client.publish(TOPICS.control3, 'STATUS');
                 });
 
                 client.on('message', function(topic, message) {
@@ -368,6 +397,8 @@
                         updateRelayStatus(1, msg);
                     } else if (topic === TOPICS.status2) {
                         updateRelayStatus(2, msg);
+                    } else if (topic === TOPICS.status3) {
+                        updateRelayStatus(3, msg);
                     }
                 });
 
@@ -410,11 +441,14 @@
             let topic;
             if (relay === 1) topic = TOPICS.control1;
             else if (relay === 2) topic = TOPICS.control2;
+            else if (relay === 3) topic = TOPICS.control3;
             else {
                 // All relays
-                client.publish(TOPICS.control1, command.replace('ALL_', ''));
-                client.publish(TOPICS.control2, command.replace('ALL_', ''));
-                console.log(`📤 Sent to both: ${command}`);
+                const cmd = command.replace('ALL_', '');
+                client.publish(TOPICS.control1, cmd);
+                client.publish(TOPICS.control2, cmd);
+                client.publish(TOPICS.control3, cmd);
+                console.log(`📤 Sent to all: ${cmd}`);
                 return;
             }
 
@@ -423,82 +457,4 @@
         }
 
         // ===== UPDATE RELAY STATUS =====
-        function updateRelayStatus(relay, status) {
-            const display = document.getElementById(`relay${relay}Display`);
-            const badge = document.getElementById(`relay${relay}Badge`);
-            const card = document.getElementById(`relay${relay}Card`);
-            
-            if (status === 'ON') {
-                display.className = 'relay-display on';
-                display.querySelector('.state-text').textContent = 'ON';
-                badge.textContent = 'ON';
-                badge.className = 'relay-status-badge on';
-                card.className = 'relay-card active';
-                
-                if (relay === 1) relay1State = 'ON';
-                else relay2State = 'ON';
-            } else if (status === 'OFF') {
-                display.className = 'relay-display off';
-                display.querySelector('.state-text').textContent = 'OFF';
-                badge.textContent = 'OFF';
-                badge.className = 'relay-status-badge off';
-                card.className = 'relay-card inactive';
-                
-                if (relay === 1) relay1State = 'OFF';
-                else relay2State = 'OFF';
-            } else {
-                display.className = 'relay-display off';
-                display.querySelector('.state-text').textContent = '?';
-                badge.textContent = 'Unknown';
-                badge.className = 'relay-status-badge unknown';
-                card.className = 'relay-card inactive';
-                
-                if (relay === 1) relay1State = '?';
-                else relay2State = '?';
-            }
-        }
-
-        // ===== UPDATE UI =====
-        function updateUI(connected) {
-            const statusBox = document.getElementById('statusBox');
-            const connectBtn = document.getElementById('connectBtn');
-            const disconnectBtn = document.getElementById('disconnectBtn');
-            
-            const buttons = [
-                'relay1On', 'relay1Off', 'relay1Toggle',
-                'relay2On', 'relay2Off', 'relay2Toggle',
-                'allOn', 'allOff', 'allToggle', 'allStatus'
-            ];
-
-            if (connected) {
-                statusBox.className = 'status-box connected';
-                statusBox.innerHTML = '✅ Connected to MQTT Broker';
-                connectBtn.style.display = 'none';
-                disconnectBtn.style.display = 'block';
-                
-                buttons.forEach(id => {
-                    document.getElementById(id).disabled = false;
-                });
-            } else {
-                statusBox.className = 'status-box disconnected';
-                statusBox.innerHTML = '⚠️ Disconnected from MQTT';
-                connectBtn.style.display = 'block';
-                disconnectBtn.style.display = 'none';
-                
-                buttons.forEach(id => {
-                    document.getElementById(id).disabled = true;
-                });
-                
-                // Reset displays
-                updateRelayStatus(1, '?');
-                updateRelayStatus(2, '?');
-            }
-        }
-
-        // ===== AUTO-CONNECT ON LOAD =====
-        window.onload = function() {
-            setTimeout(connectMQTT, 1000);
-        };
-    </script>
-</body>
-</html>
+        function updateRelayStatus(relay, status)
