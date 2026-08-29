@@ -1,44 +1,208 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>LED Test</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Relay Control</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;}
+        body{font-family:'Segoe UI',Arial,sans-serif;background:linear-gradient(135deg,#f093fb 0%,#f5576c 100%);min-height:100vh;display:flex;justify-content:center;align-items:center;padding:20px;}
+        .container{background:white;border-radius:30px;padding:40px;max-width:450px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
+        h1{text-align:center;color:#333;margin-bottom:5px;}
+        .subtitle{text-align:center;color:#999;font-size:14px;margin-bottom:20px;}
+        .status-box{padding:12px;border-radius:12px;text-align:center;margin-bottom:20px;font-weight:bold;}
+        .status-box.connected{background:#d4edda;color:#155724;border:2px solid #28a745;}
+        .status-box.disconnected{background:#f8d7da;color:#721c24;border:2px solid #dc3545;}
+        .btn{width:100%;padding:14px;border:none;border-radius:12px;font-size:16px;font-weight:bold;cursor:pointer;transition:all 0.3s;margin-bottom:10px;}
+        .btn-success{background:#28a745;color:white;}
+        .btn-danger{background:#dc3545;color:white;}
+        .btn-warning{background:#ffc107;color:#333;}
+        .btn-primary{background:#667eea;color:white;}
+        .btn:disabled{opacity:0.5;cursor:not-allowed;}
+        .btn:hover:not(:disabled){transform:translateY(-2px);}
+        .relay-display{text-align:center;padding:30px;margin:20px 0;border-radius:15px;background:#f8f9fa;transition:all 0.5s;}
+        .relay-display.on{background:#d4edda;border:3px solid #28a745;}
+        .relay-display.off{background:#f8d7da;border:3px solid #dc3545;}
+        .relay-display .icon{font-size:60px;margin-bottom:10px;}
+        .relay-display .state-text{font-size:24px;font-weight:bold;}
+        .relay-display.on .state-text{color:#28a745;}
+        .relay-display.off .state-text{color:#dc3545;}
+        .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+        .broker-info{background:#f0f0f0;padding:10px;border-radius:10px;text-align:center;font-size:13px;margin:10px 0;}
+        .broker-info span{font-weight:bold;color:#333;}
+        .footer{text-align:center;margin-top:20px;font-size:12px;color:#999;}
+    </style>
 </head>
 <body>
-    <h1>💡 LED Test (GPIO0)</h1>
-    <button onclick="sendCommand('ON')">Turn LED ON</button>
-    <button onclick="sendCommand('OFF')">Turn LED OFF</button>
-    <pre id="log"></pre>
+    <div class="container">
+        <h1>💡 Smart Relay</h1>
+        <div class="subtitle">Control via MQTT</div>
+
+        <div id="statusBox" class="status-box disconnected">
+            ⚠️ Disconnected from MQTT
+        </div>
+
+        <div class="broker-info">
+            📡 Broker: <span>broker.emqx.io</span> | Topic: <span>smartrelay/pod1/control</span>
+        </div>
+
+        <!-- Relay Status Display -->
+        <div id="relayDisplay" class="relay-display off">
+            <div class="icon">💡</div>
+            <div class="state-text">OFF</div>
+        </div>
+
+        <!-- Control Buttons -->
+        <div class="grid-2">
+            <button id="btnOn" class="btn btn-success" onclick="sendCommand('ON')" disabled>
+                ✅ Turn ON
+            </button>
+            <button id="btnOff" class="btn btn-danger" onclick="sendCommand('OFF')" disabled>
+                ❌ Turn OFF
+            </button>
+        </div>
+        <button id="btnToggle" class="btn btn-warning" onclick="sendCommand('TOGGLE')" disabled>
+            🔄 Toggle Relay
+        </button>
+
+        <div style="margin-top:15px;text-align:center;font-size:13px;color:#666;">
+            Status: <span id="relayState">Unknown</span>
+        </div>
+
+        <button class="btn btn-primary" onclick="connectMQTT()" id="connectBtn">
+            🔌 Connect to MQTT
+        </button>
+        <button class="btn btn-danger" onclick="disconnectMQTT()" id="disconnectBtn" style="display:none;">
+            ⚡ Disconnect
+        </button>
+
+        <div class="footer">Smart Relay Controller v2.0</div>
+    </div>
 
     <script>
-        let client;
-        const log = msg => document.getElementById('log').textContent += msg + '\n';
-        
-        // Connect to MQTT
-        client = new Paho.MQTT.Client('broker.emqx.io', 8084, 'web_' + Math.random());
-        client.connect({
-            useSSL: true,
-            onSuccess: () => {
-                log('✅ Connected to MQTT');
-                client.subscribe('house/livingroom/light/status');
-            },
-            onFailure: err => log('❌ Failed: ' + err.errorMessage)
-        });
-        
-        client.onMessageArrived = msg => {
-            log('📨 Status: ' + msg.payloadString);
-        };
-        
-        function sendCommand(cmd) {
-            if (client && client.isConnected()) {
-                const msg = new Paho.MQTT.Message(cmd);
-                msg.destinationName = 'house/livingroom/light';
-                client.send(msg);
-                log('📤 Sent: ' + cmd);
-            } else {
-                log('⚠️ Not connected!');
+        let client = null;
+        let isConnected = false;
+        const CONTROL_TOPIC = "smartrelay/pod1/control";
+        const STATUS_TOPIC = "smartrelay/pod1/status";
+        const BROKER_URL = "wss://broker.emqx.io:8084/mqtt";
+
+        function connectMQTT() {
+            const statusBox = document.getElementById('statusBox');
+            statusBox.className = 'status-box disconnected';
+            statusBox.innerHTML = '⏳ Connecting to MQTT...';
+
+            try {
+                client = mqtt.connect(BROKER_URL, {
+                    keepalive: 30,
+                    reconnectPeriod: 5000
+                });
+
+                client.on('connect', function() {
+                    console.log('Connected to MQTT');
+                    isConnected = true;
+                    client.subscribe(STATUS_TOPIC);
+                    updateUI(true);
+                    client.publish(CONTROL_TOPIC, 'STATUS');
+                });
+
+                client.on('message', function(topic, message) {
+                    const msg = message.toString();
+                    console.log(`Status: ${msg}`);
+                    updateRelayStatus(msg);
+                });
+
+                client.on('error', function(err) {
+                    console.error('MQTT Error:', err);
+                    isConnected = false;
+                    updateUI(false);
+                    alert('Connection failed! Check your internet.');
+                });
+
+                client.on('close', function() {
+                    console.log('Disconnected');
+                    isConnected = false;
+                    updateUI(false);
+                });
+
+            } catch (e) {
+                alert('Error: ' + e.message);
+                updateUI(false);
             }
         }
+
+        function disconnectMQTT() {
+            if (client) {
+                client.end();
+                client = null;
+            }
+            isConnected = false;
+            updateUI(false);
+        }
+
+        function sendCommand(command) {
+            if (!isConnected || !client) {
+                alert('Not connected to MQTT!');
+                return;
+            }
+            client.publish(CONTROL_TOPIC, command);
+            console.log(`Sent: ${command}`);
+        }
+
+        function updateRelayStatus(status) {
+            const display = document.getElementById('relayDisplay');
+            const stateText = document.getElementById('relayState');
+            
+            if (status === 'ON') {
+                display.className = 'relay-display on';
+                display.querySelector('.state-text').textContent = 'ON';
+                stateText.textContent = 'ON';
+                stateText.style.color = '#28a745';
+            } else if (status === 'OFF') {
+                display.className = 'relay-display off';
+                display.querySelector('.state-text').textContent = 'OFF';
+                stateText.textContent = 'OFF';
+                stateText.style.color = '#dc3545';
+            } else {
+                display.className = 'relay-display off';
+                display.querySelector('.state-text').textContent = '?';
+                stateText.textContent = 'Unknown';
+                stateText.style.color = '#666';
+            }
+        }
+
+        function updateUI(connected) {
+            const statusBox = document.getElementById('statusBox');
+            const connectBtn = document.getElementById('connectBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            const btnOn = document.getElementById('btnOn');
+            const btnOff = document.getElementById('btnOff');
+            const btnToggle = document.getElementById('btnToggle');
+            
+            if (connected) {
+                statusBox.className = 'status-box connected';
+                statusBox.innerHTML = '✅ Connected to MQTT Broker';
+                connectBtn.style.display = 'none';
+                disconnectBtn.style.display = 'block';
+                btnOn.disabled = false;
+                btnOff.disabled = false;
+                btnToggle.disabled = false;
+            } else {
+                statusBox.className = 'status-box disconnected';
+                statusBox.innerHTML = '⚠️ Disconnected from MQTT';
+                connectBtn.style.display = 'block';
+                disconnectBtn.style.display = 'none';
+                btnOn.disabled = true;
+                btnOff.disabled = true;
+                btnToggle.disabled = true;
+                updateRelayStatus('?');
+            }
+        }
+
+        // Auto-connect on page load
+        window.onload = function() {
+            setTimeout(connectMQTT, 1000);
+        };
     </script>
 </body>
 </html>
