@@ -284,6 +284,20 @@
             display: block;
         }
 
+        .security-notice {
+            background: #fff3cd;
+            padding: 10px;
+            border-radius: 10px;
+            border: 1px solid #ffc107;
+            font-size: 12px;
+            color: #856404;
+            margin: 10px 0;
+            display: none;
+        }
+        .security-notice.show {
+            display: block;
+        }
+
         @media (max-width: 400px) {
             .container { padding: 20px; }
             .btn-group { grid-template-columns: 1fr 1fr; }
@@ -302,19 +316,23 @@
         ⚠️ Disconnected from MQTT
     </div>
 
+    <div class="security-notice" id="securityNotice">
+        🔒 Using secure WebSocket (wss://) for HTTPS page
+    </div>
+
     <div class="broker-info">
         📡 Broker: <span>broker.emqx.io</span>
         <br>
-        <small id="currentUrlDisplay">ws://broker.emqx.io:8084/mqtt</small>
+        <small id="currentUrlDisplay">wss://broker.emqx.io:8084/mqtt</small>
     </div>
 
     <!-- URL Selector -->
     <div class="url-selector">
-        <button class="btn active-url" onclick="setBrokerUrl('ws')" id="urlWs">
+        <button class="btn inactive-url" onclick="setBrokerUrl('ws')" id="urlWs">
             🔗 ws:// (HTTP)
         </button>
-        <button class="btn inactive-url" onclick="setBrokerUrl('wss')" id="urlWss">
-            🔒 wss:// (HTTPS)
+        <button class="btn active-url" onclick="setBrokerUrl('wss')" id="urlWss">
+            🔒 wss:// (HTTPS) ✓
         </button>
     </div>
 
@@ -409,7 +427,9 @@
     let reconnectAttempts = 0;
     let maxReconnectAttempts = 3;
     let debugMode = false;
-    let brokerUrl = "ws://broker.emqx.io:8084/mqtt";
+    
+    // DEFAULT: Use wss:// (secure) for HTTPS pages
+    let brokerUrl = "wss://broker.emqx.io:8084/mqtt";
 
     const TOPICS = {
         control1: "smartrelay/pod1/control1",
@@ -424,17 +444,34 @@
     let relay2State = '?';
     let relay3State = '?';
 
+    // Check if page is HTTPS
+    if (window.location.protocol === 'https:') {
+        document.getElementById('securityNotice').classList.add('show');
+        document.getElementById('securityNotice').innerHTML = '🔒 HTTPS page detected - using secure WebSocket (wss://)';
+        brokerUrl = "wss://broker.emqx.io:8084/mqtt";
+        document.getElementById('urlWss').className = 'btn active-url';
+        document.getElementById('urlWs').className = 'btn inactive-url';
+    }
+
     function setBrokerUrl(type) {
         if (type === 'ws') {
+            // Check if page is HTTPS
+            if (window.location.protocol === 'https:') {
+                alert('⚠️ Cannot use ws:// (insecure) from an HTTPS page!\n\nPlease use wss:// (secure) instead.');
+                return;
+            }
             brokerUrl = "ws://broker.emqx.io:8084/mqtt";
             document.getElementById('urlWs').className = 'btn active-url';
             document.getElementById('urlWss').className = 'btn inactive-url';
             document.getElementById('currentUrlDisplay').textContent = 'ws://broker.emqx.io:8084/mqtt';
+            document.getElementById('securityNotice').classList.remove('show');
         } else {
             brokerUrl = "wss://broker.emqx.io:8084/mqtt";
             document.getElementById('urlWss').className = 'btn active-url';
             document.getElementById('urlWs').className = 'btn inactive-url';
             document.getElementById('currentUrlDisplay').textContent = 'wss://broker.emqx.io:8084/mqtt';
+            document.getElementById('securityNotice').classList.add('show');
+            document.getElementById('securityNotice').innerHTML = '🔒 Using secure WebSocket (wss://) for HTTPS page';
         }
         debugLog('🔗 Broker URL changed to: ' + brokerUrl);
         
@@ -462,6 +499,7 @@
             document.getElementById('debugBtn').textContent = '🔍 Hide Debug';
             debugLog('🐞 Debug mode enabled');
             debugLog('🔗 Current URL: ' + brokerUrl);
+            debugLog('🔒 Page protocol: ' + window.location.protocol);
         } else {
             console.classList.remove('show');
             document.getElementById('debugBtn').textContent = '🐞 Debug';
@@ -531,7 +569,7 @@
                     setTimeout(connectMQTT, 3000);
                 } else {
                     statusBox.className = 'status-box disconnected';
-                    statusBox.innerHTML = '⚠️ Connection failed. Try ws:// or wss:// button above.';
+                    statusBox.innerHTML = '⚠️ Connection failed. Make sure you are using wss:// (secure) for HTTPS.';
                 }
             });
 
@@ -667,6 +705,15 @@
     window.onload = function() {
         debugLog('📄 Page loaded');
         debugLog('🔗 Default URL: ' + brokerUrl);
+        debugLog('🔒 Page protocol: ' + window.location.protocol);
+        
+        // Auto-select wss:// for HTTPS
+        if (window.location.protocol === 'https:') {
+            document.getElementById('urlWss').className = 'btn active-url';
+            document.getElementById('urlWs').className = 'btn inactive-url';
+            brokerUrl = "wss://broker.emqx.io:8084/mqtt";
+            document.getElementById('currentUrlDisplay').textContent = 'wss://broker.emqx.io:8084/mqtt';
+        }
         
         const statusBox = document.getElementById('statusBox');
         statusBox.className = 'status-box connecting';
